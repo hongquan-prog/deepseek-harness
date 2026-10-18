@@ -23,6 +23,7 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/lsp/tool-lsp': { category: 'optional', reason: 'Model tools selected together with a configured LSP provider.' },
   'packages/ssh/ssh': { category: 'optional', reason: 'Explicit remote connection and helper configuration.' },
   'packages/ssh/wsl': { category: 'optional', reason: 'Explicit WSL distribution connection selected in a remote composition.' },
+  'packages/bundle/wsl': { category: 'optional', reason: 'Explicit WSL execution-world composition installed into a profile.' },
   'packages/ssh/ssh-helper-runtime': { category: 'optional', reason: 'Private executable carrier for explicitly configured SSH connections.' },
   'packages/ssh/fs-ssh': { category: 'optional', reason: 'Remote filesystem provider selected in an SSH composition.' },
   'packages/ssh/sandbox-ssh': { category: 'optional', reason: 'Remote confinement provider selected in an SSH composition.' },

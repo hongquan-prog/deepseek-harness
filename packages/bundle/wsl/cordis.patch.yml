@@ -1,0 +1,37 @@
+# The dsh-wsl bundle patch: move the filesystem, ordinary-process and sandbox
+# providers into one WSL distribution while the Harness stays on Windows.
+# A patch cannot rename an existing row, so the local providers are disabled and
+# the WSL-backed providers are inserted under `wsl-*` ids. Layer this over a
+# base-backed profile; a later profile patch that names one of these ids
+# configures or disables it (last layer wins).
+#
+# Deployment coordinates come from the explicit `wsl-ssh` row first and fall
+# back to DSH_WSL_* environment variables inside dsh-wsl. `sandbox-policy` must
+# name the same Linux workspace because file effects are confined there.
+
+- id: subprocess
+  disabled: true
+
+- id: sandbox
+  disabled: true
+
+- id: fs-sandbox
+  disabled: true
+
+- id: sandbox-policy
+  config:
+    mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
+    workspaceRoot: !!js "process.env.DSH_WSL_WORKSPACE ?? (() => { throw new Error('dsh-wsl-bundle: set DSH_WSL_WORKSPACE or patch the sandbox-policy row explicitly'); })()"
+
+- insert:
+    - id: wsl-ssh
+      name: '@deepseek-ai/dsh-wsl'
+
+    - id: wsl-subprocess
+      name: '@deepseek-ai/dsh-subprocess-ssh'
+
+    - id: wsl-sandbox
+      name: '@deepseek-ai/dsh-sandbox-ssh'
+
+    - id: wsl-fs
+      name: '@deepseek-ai/dsh-fs-ssh'

@@ -87,6 +87,7 @@
       "@deepseek-ai/dsh-ssh/protocol": ["./packages/ssh/ssh/src/protocol.ts"],
       "@deepseek-ai/dsh-ssh/schemas": ["./packages/ssh/ssh/src/schemas.ts"],
       "@deepseek-ai/dsh-ssh/stream-security": ["./packages/ssh/ssh/src/stream-security.ts"],
+      "@deepseek-ai/dsh-wsl-bundle": ["./packages/bundle/wsl/src"],
       "@deepseek-ai/dsh-subprocess-local/output": ["./packages/subprocess/subprocess-local/src/output.ts"],
       "@deepseek-ai/dsh-computer-use": ["./packages/computer-use/computer-use/src/index.ts"],
       "@deepseek-ai/dsh-computer-use/brand": ["./packages/computer-use/computer-use/src/brand.ts"],

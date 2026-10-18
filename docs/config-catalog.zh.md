@@ -3191,7 +3191,7 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-ssh`
 
-- `source`: [`packages/ssh/ssh/src/index.ts:33`](../packages/ssh/ssh/src/index.ts)
+- `source`: [`packages/ssh/ssh/src/index.ts:34`](../packages/ssh/ssh/src/index.ts)
 
 ```ts config-catalog
 /** Deployment-owned SSH identity and installed helper; no model argument selects these values. */
@@ -4585,6 +4585,56 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-workspace-changes -->
 
+<!-- BEGIN GENERATED config-catalog:@deepseek-ai/dsh-wsl -->
+<a id="deepseek-aidsh-wsl"></a>
+
+## `@deepseek-ai/dsh-wsl`
+
+- `source`: [`packages/ssh/wsl/src/index.ts:54`](../packages/ssh/wsl/src/index.ts)
+
+```ts config-catalog
+/**
+ * Deployment-owned WSL configuration. Explicit fields win over {@link WSL_ENV};
+ * a field absent from both sources fails startup instead of defaulting silently.
+ */
+export interface Config {
+  /** Windows `wsl.exe` path or command name; falls back to `DSH_WSL_EXE`, then `wsl.exe`. */
+  wsl?: string
+  /** Installed distribution name passed to `-d`; falls back to `DSH_WSL_DISTRO`. */
+  distro?: string
+  /** Absolute directory inside the distribution; falls back to `DSH_WSL_WORKSPACE`. */
+  workspace?: string
+  /** Absolute helper entry inside the distribution; falls back to `DSH_WSL_HELPER`. */
+  helper?: string
+  /** Helper invocation; falls back to a node-script launch from `DSH_WSL_NODE`. */
+  launch?: WslHelperLaunch
+  /** Lowercase SHA-256 of the installed helper; falls back to `DSH_WSL_HELPER_HASH`. */
+  helperHash?: string
+  /** Administrative request deadline, at most 2,147,483,647 milliseconds. */
+  requestTimeoutMs?: number
+  /** Maximum JSON payload bytes per helper request or response. */
+  maxFrameBytes?: number
+  /** Maximum ordinary requests; heartbeat and bounded cleanup have reserved capacity. */
+  maxPending?: number
+  /** Remote helper lease; loss of heartbeats starts remote managed cleanup. */
+  leaseMs?: number
+}
+
+/** Installed helper invocation inside the distribution. */
+export type WslHelperLaunch = {
+  /** Run the helper entry with the distribution's own Node executable. */
+  kind: 'node-script'
+  /** Absolute Node executable inside the distribution. */
+  node: string
+  /** Node CLI options before the entry (source deployments use the tsx loader). */
+  nodeArgs?: string[]
+} | {
+  /** Run a self-contained helper executable. */
+  kind: 'executable'
+}
+```
+<!-- END GENERATED config-catalog:@deepseek-ai/dsh-wsl -->
+
 ## 无配置的可加载插件
 
 这些插件通过 `cordis.yml` 中不含 `config:` 块的条目加载；它们未声明任何配置接口。
@@ -4800,4 +4850,5 @@ export interface Config {
 | `@deepseek-ai/dsh-util-values` | — | [`packages/util/values/src/index.ts`](../packages/util/values/src/index.ts) |
 | `@deepseek-ai/dsh-util-workspace-path` | — | [`packages/util/workspace-path/src/index.ts`](../packages/util/workspace-path/src/index.ts) |
 | `@deepseek-ai/dsh-win32-process` | — | [`packages/subprocess/win32-process/src/index.ts`](../packages/subprocess/win32-process/src/index.ts) |
+| `@deepseek-ai/dsh-wsl-bundle` | — | [`packages/bundle/wsl/src/index.ts`](../packages/bundle/wsl/src/index.ts) |
 <!-- END GENERATED config-catalog:library -->

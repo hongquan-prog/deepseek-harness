@@ -36,9 +36,33 @@ export interface WslLaunchTarget {
   launch: WslHelperLaunch
 }
 
-/** Deployment-owned WSL connection and helper limits. */
-export interface Config extends WslLaunchTarget {
-  /** Lowercase SHA-256 of the installed helper; mismatches refuse the connection. */
+/** Environment variables that supply deployment coordinates missing from configuration. */
+export const WSL_ENV = {
+  wsl: 'DSH_WSL_EXE',
+  distro: 'DSH_WSL_DISTRO',
+  workspace: 'DSH_WSL_WORKSPACE',
+  helper: 'DSH_WSL_HELPER',
+  node: 'DSH_WSL_NODE',
+  nodeArgs: 'DSH_WSL_NODE_ARGS',
+  helperHash: 'DSH_WSL_HELPER_HASH',
+} as const
+
+/**
+ * Deployment-owned WSL configuration. Explicit fields win over {@link WSL_ENV};
+ * a field absent from both sources fails startup instead of defaulting silently.
+ */
+export interface Config {
+  /** Windows `wsl.exe` path or command name; falls back to `DSH_WSL_EXE`, then `wsl.exe`. */
+  wsl?: string
+  /** Installed distribution name passed to `-d`; falls back to `DSH_WSL_DISTRO`. */
+  distro?: string
+  /** Absolute directory inside the distribution; falls back to `DSH_WSL_WORKSPACE`. */
+  workspace?: string
+  /** Absolute helper entry inside the distribution; falls back to `DSH_WSL_HELPER`. */
+  helper?: string
+  /** Helper invocation; falls back to a node-script launch from `DSH_WSL_NODE`. */
+  launch?: WslHelperLaunch
+  /** Lowercase SHA-256 of the installed helper; falls back to `DSH_WSL_HELPER_HASH`. */
   helperHash?: string
   /** Administrative request deadline, at most 2,147,483,647 milliseconds. */
   requestTimeoutMs?: number
@@ -73,6 +97,55 @@ const configSchema = z.object({
 type ResolvedConfig = z.infer<typeof configSchema>
 
 /**
+ * Resolve deployment coordinates from explicit configuration over environment defaults.
+ * @param input - partial connection configuration; every explicit field wins.
+ * @param env - environment holding {@link WSL_ENV} fallbacks.
+ * @returns the validated, complete connection configuration.
+ * @throws when a required coordinate is absent from both sources or invalid.
+ */
+export function resolveWslConfig(input: Config, env: NodeJS.ProcessEnv = process.env): ResolvedConfig {
+  const present = (value: string | undefined): string | undefined => value === undefined || value === '' ? undefined : value
+  const fromEnvironment = (name: keyof typeof WSL_ENV): string | undefined => present(env[WSL_ENV[name]])
+  const required = (field: 'distro' | 'workspace' | 'helper'): string => {
+    const value = present(input[field]) ?? fromEnvironment(field)
+    if (value === undefined) {
+      throw new Error(`WSL configuration is missing '${field}'; set config.${field} or ${WSL_ENV[field]}`)
+    }
+    return value
+  }
+  let launch = input.launch
+  if (launch === undefined) {
+    const node = fromEnvironment('node')
+    if (node !== undefined) {
+      const rawArgs = fromEnvironment('nodeArgs')
+      let nodeArgs: string[] | undefined
+      if (rawArgs !== undefined) {
+        try { nodeArgs = z.array(z.string()).parse(JSON.parse(rawArgs)) }
+        catch (error) {
+          throw new Error(`WSL environment ${WSL_ENV.nodeArgs} must be a JSON array of strings`, { cause: error })
+        }
+      }
+      launch = { kind: 'node-script', node, ...(nodeArgs === undefined ? {} : { nodeArgs }) }
+    }
+  }
+  if (launch === undefined) {
+    throw new Error(`WSL configuration is missing 'launch'; set config.launch or ${WSL_ENV.node}`)
+  }
+  return configSchema.parse({
+    wsl: present(input.wsl) ?? fromEnvironment('wsl') ?? 'wsl.exe',
+    distro: required('distro'),
+    workspace: required('workspace'),
+    helper: required('helper'),
+    launch,
+    helperHash: present(input.helperHash) ?? fromEnvironment('helperHash'),
+    requestTimeoutMs: input.requestTimeoutMs,
+    maxFrameBytes: input.maxFrameBytes,
+    maxPending: input.maxPending,
+    leaseMs: input.leaseMs,
+  })
+}
+
+/**
  * Build the `wsl.exe` argument list that starts one helper inside a distribution.
  * @param target - selected distribution, workspace and helper invocation.
  * @returns arguments after the WSL executable itself.
@@ -87,10 +160,10 @@ export function wslHelperArgs(target: WslLaunchTarget): string[] {
 /** One WSL-run helper connection consumed by the filesystem, subprocess and sandbox providers. */
 export class WslConnection extends Service implements SshService {
   static Config: schema<Config> = schema.object({
-    wsl: schema.string().default('wsl.exe'),
-    distro: schema.string().required(),
-    workspace: schema.string().required(),
-    helper: schema.string().required(),
+    wsl: schema.string(),
+    distro: schema.string(),
+    workspace: schema.string(),
+    helper: schema.string(),
     launch: schema.union([
       schema.object({
         kind: schema.const('node-script').required(),
@@ -98,7 +171,7 @@ export class WslConnection extends Service implements SshService {
         nodeArgs: schema.array(schema.string()),
       }),
       schema.object({ kind: schema.const('executable').required() }),
-    ]).required(),
+    ]),
     helperHash: schema.string(),
     requestTimeoutMs: schema.number().default(30_000),
     maxFrameBytes: schema.number().default(64 * 1024 * 1024),
@@ -125,7 +198,7 @@ export class WslConnection extends Service implements SshService {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'ssh')
-    this.config = configSchema.parse(config)
+    this.config = resolveWslConfig(config)
     this.ready = this.start()
     void this.ready.catch((error: unknown) => {
       /* v8 ignore next -- start rejects only Error values. */

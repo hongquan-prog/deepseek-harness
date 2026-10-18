@@ -42,6 +42,8 @@ Mount `dsh-wsl` in place of `dsh-ssh`, then mount the existing remote providers.
 
 The host must provide a Windows WSL2 installation with localhost forwarding enabled, and the distribution must contain either a Node 22.19-or-newer executable plus the helper entry or a self-contained helper executable. Startup rejects a non-Linux helper, a mismatched launch kind or a mismatched helper digest. An unknown distribution, a missing `wsl.exe` and a helper that exits during the handshake all fail readiness with the captured WSL diagnostics instead of degrading to local execution.
 
+Every deployment coordinate can also come from the environment, applied only when the explicit field is absent: `DSH_WSL_EXE`, `DSH_WSL_DISTRO`, `DSH_WSL_WORKSPACE`, `DSH_WSL_HELPER`, `DSH_WSL_NODE`, `DSH_WSL_NODE_ARGS` (a JSON string array) and `DSH_WSL_HELPER_HASH`. Explicit configuration wins over the environment; when neither supplies a required coordinate, startup fails naming the field and its variable instead of defaulting silently. The environment can only supply a `node-script` launch; a self-contained executable requires an explicit `launch`.
+
 -----
 
 <a id="understand-the-implementation"></a>

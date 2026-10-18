@@ -1,7 +1,7 @@
 /** Launch construction and configuration admission for the WSL connection. */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
-import { WslConnection, wslHelperArgs, type Config, type WslLaunchTarget } from '../src/index.ts'
+import { resolveWslConfig, WSL_ENV, WslConnection, wslHelperArgs, type Config, type WslLaunchTarget } from '../src/index.ts'
 
 const target: WslLaunchTarget = {
   wsl: 'wsl.exe',
@@ -33,6 +33,68 @@ describe('wslHelperArgs', () => {
     expect(wslHelperArgs({ ...target, launch: { kind: 'node-script', node: '/usr/bin/node' } })).toEqual([
       '-d', 'Ubuntu-24.04', '--cd', '/home/dev/project', '--', '/usr/bin/node', '/opt/dsh/helper-entry.ts',
     ])
+  })
+})
+
+describe('resolveWslConfig', () => {
+  const environment = {
+    [WSL_ENV.wsl]: '/env/wsl.exe',
+    [WSL_ENV.distro]: 'Ubuntu-Env',
+    [WSL_ENV.workspace]: '/home/env',
+    [WSL_ENV.helper]: '/opt/env-helper.mjs',
+    [WSL_ENV.node]: '/usr/bin/env-node',
+    [WSL_ENV.nodeArgs]: '["--import","tsx/esm"]',
+    [WSL_ENV.helperHash]: 'd'.repeat(64),
+  }
+
+  it('falls back to the environment for every absent coordinate', () => {
+    expect(resolveWslConfig({}, environment)).toMatchObject({
+      wsl: '/env/wsl.exe', distro: 'Ubuntu-Env', workspace: '/home/env', helper: '/opt/env-helper.mjs',
+      launch: { kind: 'node-script', node: '/usr/bin/env-node', nodeArgs: ['--import', 'tsx/esm'] },
+      helperHash: 'd'.repeat(64),
+    })
+  })
+
+  it('lets explicit configuration override each environment default', () => {
+    expect(resolveWslConfig({
+      wsl: '/explicit/wsl.exe',
+      distro: 'Ubuntu-Explicit',
+      workspace: '/home/explicit',
+      helper: '/opt/explicit.mjs',
+      launch: { kind: 'executable' },
+      helperHash: 'e'.repeat(64),
+    }, environment)).toMatchObject({
+      wsl: '/explicit/wsl.exe', distro: 'Ubuntu-Explicit', workspace: '/home/explicit',
+      helper: '/opt/explicit.mjs', launch: { kind: 'executable' }, helperHash: 'e'.repeat(64),
+    })
+  })
+
+  it('treats an empty explicit value like an absent one', () => {
+    expect(resolveWslConfig({ distro: '', workspace: '', helper: '', wsl: '' }, environment)).toMatchObject({
+      wsl: '/env/wsl.exe', distro: 'Ubuntu-Env', workspace: '/home/env', helper: '/opt/env-helper.mjs',
+    })
+  })
+
+  it('reports the missing coordinate with its environment variable', () => {
+    expect(() => resolveWslConfig({ helper: '/opt/h.mjs', launch: { kind: 'executable' } }, {}))
+      .toThrow(/distro.*DSH_WSL_DISTRO/u)
+    expect(() => resolveWslConfig({ distro: 'D', workspace: '/w', helper: '/h' }, {}))
+      .toThrow(/launch.*DSH_WSL_NODE/u)
+  })
+
+  it('uses a bare node-script launch when the environment has no node options', () => {
+    const resolved = resolveWslConfig({}, {
+      [WSL_ENV.distro]: 'Ubuntu-Env',
+      [WSL_ENV.workspace]: '/home/env',
+      [WSL_ENV.helper]: '/opt/env-helper.mjs',
+      [WSL_ENV.node]: '/usr/bin/env-node',
+    })
+    expect(resolved.launch).toEqual({ kind: 'node-script', node: '/usr/bin/env-node', nodeArgs: [] })
+  })
+
+  it('rejects malformed node options in the environment', () => {
+    expect(() => resolveWslConfig({}, { ...environment, [WSL_ENV.nodeArgs]: 'not-json' }))
+      .toThrow(/DSH_WSL_NODE_ARGS/u)
   })
 })
 

@@ -42,6 +42,8 @@ kind: "package-reference"
 
 宿主必须提供启用了 localhost 转发的 Windows WSL2 安装，发行版内必须有 Node 22.19 或更新版本的可执行文件加 helper 入口，或者一个自包含的 helper 可执行文件。启动时会拒绝非 Linux 的 helper、不匹配的 launch 类型或不匹配的 helper 摘要。发行版不存在、`wsl.exe` 缺失、helper 在握手期间退出，都会让 readiness 失败并带上捕获到的 WSL 诊断，而不是静默降级为本地执行。
 
+每一项部署坐标也可以来自环境变量，只在对应显式字段缺失时生效：`DSH_WSL_EXE`、`DSH_WSL_DISTRO`、`DSH_WSL_WORKSPACE`、`DSH_WSL_HELPER`、`DSH_WSL_NODE`、`DSH_WSL_NODE_ARGS`（JSON 字符串数组）与 `DSH_WSL_HELPER_HASH`。显式配置优先于环境变量；两者都没有提供必需坐标时，启动会报出字段与其变量名，而不是静默取默认值。环境变量只能提供 `node-script` launch；自包含可执行文件需要显式配置 `launch`。
+
 -----
 
 <a id="understand-the-implementation"></a>

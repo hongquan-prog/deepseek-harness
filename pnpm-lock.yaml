@@ -3128,6 +3128,28 @@ importers:
         specifier: ^0.1.5
         version: 0.1.5
 
+  packages/bundle/wsl:
+    dependencies:
+      '@deepseek-ai/dsh-fs-ssh':
+        specifier: workspace:*
+        version: link:../../ssh/fs-ssh
+      '@deepseek-ai/dsh-sandbox-ssh':
+        specifier: workspace:*
+        version: link:../../ssh/sandbox-ssh
+      '@deepseek-ai/dsh-subprocess-ssh':
+        specifier: workspace:*
+        version: link:../../ssh/subprocess-ssh
+      '@deepseek-ai/dsh-wsl':
+        specifier: workspace:*
+        version: link:../../ssh/wsl
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-loader-smoke':
+        specifier: workspace:*
+        version: link:../../test-support/loader-smoke
+
   packages/client/connection:
     dependencies:
       '@deepseek-ai/dsh-credentials':
