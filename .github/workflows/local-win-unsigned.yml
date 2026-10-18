@@ -1,0 +1,77 @@
+# Local-only unsigned Windows desktop build for a fork. This workflow is not a
+# release path: it exists so a fork can produce an installer without a local
+# Windows toolchain or npm publication. It never signs, uploads or publishes.
+name: Local Windows unsigned build
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to build (must contain this workflow)
+        type: string
+        required: true
+        default: local-win-build
+
+permissions:
+  contents: read
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v5.0.0
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure the local unsigned build
+        shell: pwsh
+        run: |
+          @"
+          DSH_DESKTOP_APP_ID=com.deepseek.harness.local
+          DSH_DESKTOP_AUTO_UPDATE_ENV=test
+          DOWNLOAD_TEST_ORIGIN=https://example.com
+          DOWNLOAD_TEST_RELEASE_ID=0123456789abcdef0123456789abcdef
+          DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN=https://example.com
+          DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://example.com
+          DSH_DESKTOP_MANDATORY_UPDATE_CONFIG={"allowedAuthOrigins":["https://example.com"]}
+          "@ | Set-Content -Encoding utf8 apps/desktop/.env.windows
+
+      - name: Validate packaging configuration
+        shell: pwsh
+        run: pnpm run package:desktop:win:x64:unsigned --check
+
+      - name: Build the unsigned installer
+        shell: pwsh
+        run: pnpm run package:desktop:win:x64:unsigned
+
+      - name: Retain the unsigned installer
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: local-win-x64-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Retain packaging diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: local-win-packaging-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/desktop/.desktop-build/packaging-runs/**
+          if-no-files-found: ignore
+          retention-days: 14
