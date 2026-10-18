@@ -16,7 +16,7 @@ async function dumpConfig(): Promise<string> {
   return await new Promise<string>((resolve, reject) => {
     const launch = resolveExampleLaunch({
       srcBin: join(repositoryRoot, 'apps/cli/src/bin.ts'),
-      configArgs: ['--profile', 'headless', '--patch', patch, '--dump-config'],
+      configArgs: ['--profile', 'web', '--patch', patch, '--dump-config'],
       tsconfigPath: join(repositoryRoot, 'tsconfig.json'),
       env: {
         DSH_HOME: home,
@@ -60,6 +60,9 @@ describe('WSL bundle composition', () => {
     expect(tree).toContain("- id: wsl-fs\n  name: '@deepseek-ai/dsh-fs-ssh'")
     expect(tree).toContain("- id: fs-sandbox\n  name: '@deepseek-ai/dsh-fs-sandbox'\n  disabled: true")
     expect(tree).toContain("- id: sandbox-policy\n  name: '@deepseek-ai/dsh-sandbox-policy'\n  config:\n    mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'")
+    expect(tree).toContain("- id: directory-picker\n  name: '@deepseek-ai/dsh-host-directory-picker-auto'\n  disabled: true")
+    expect(tree).toContain("- id: wsl-directory-picker\n  name: '@deepseek-ai/dsh-host-directory-picker-wsl'")
+    expect(tree).toContain("- id: wsl-directory-picker-browse\n  name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'")
     expect(tree).toContain('workspaceRoot: !!js')
   }, 60_000)
 })

@@ -35,6 +35,8 @@ bundle 是补丁层，不是运行时插件。它的行在全部 bundle 层之�
 
 每一项部署坐标都先取显式配置，缺失时回退环境变量：`DSH_WSL_EXE`、`DSH_WSL_DISTRO`、`DSH_WSL_WORKSPACE`、`DSH_WSL_HELPER`、`DSH_WSL_NODE`、`DSH_WSL_NODE_ARGS`（JSON 字符串数组）与 `DSH_WSL_HELPER_HASH`。环境变量不能选择自包含可执行文件的 launch，这种部署要显式配置 `launch`。沙箱策略需要同一个 Linux 工作区：它的 `workspaceRoot` 在这里来自 `DSH_WSL_WORKSPACE`，未设置时装载即失败；因此显式配置 `wsl-ssh.workspace` 的 profile 必须同时用同一目录 patch `sandbox-policy` 行。
 
+bundle 还会用 WSL browse 后端与既有的应用内对话框替换宿主的自适应目录选择器，因此工作区选择列出的是发行版目录而不是宿主盘符。
+
 宿主必须提供启用了 localhost 转发的 WSL2，发行版内要有 helper（Node 可执行文件加 helper 入口，或自包含可执行文件）。连接契约与失败行为见 [`dsh-wsl`](../../ssh/wsl/README.zh.md)。
 
 -----

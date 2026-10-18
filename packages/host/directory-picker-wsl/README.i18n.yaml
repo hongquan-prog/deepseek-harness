@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/host/directory-picker-wsl/README.md
+/:
+  en: ec4a0852c7225a70
+  zh: a9803fcd51c43c39
+/deepseek-ai-dsh-host-directory-picker-wsl:
+  en: 34f1ce0e34996504
+  zh: ebefd9591cd0c610
+/deepseek-ai-dsh-host-directory-picker-wsl/summary:
+  en: e0abeb6258dca2f9
+  zh: 9b76889c6e9bc5cb
+/deepseek-ai-dsh-host-directory-picker-wsl/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 725b47765ee8f30b
+/deepseek-ai-dsh-host-directory-picker-wsl/use-this-package:
+  en: 9d7988d91e3a90e0
+  zh: 39235ce27f76b670
+/deepseek-ai-dsh-host-directory-picker-wsl/understand-the-implementation:
+  en: 694994b04c956642
+  zh: a7a800c5cf8ba3c1
+/deepseek-ai-dsh-host-directory-picker-wsl/further-exploration:
+  en: 4e15eb515f80423a
+  zh: 23c43c0a79b1bff6
+/deepseek-ai-dsh-host-directory-picker-wsl/model-experience:
+  en: d0ad8d887feb3688
+  zh: f5229488d17e804c
+/deepseek-ai-dsh-host-directory-picker-wsl/model-experience/kv-cache-effect:
+  en: 17cd4038c9fe4ebd
+  zh: a230eb472b96325d
+/deepseek-ai-dsh-host-directory-picker-wsl/known-limitations-and-deferred-work:
+  en: b7488f19b9a22b6f
+  zh: 68c1bcef2aa6572d
+/deepseek-ai-dsh-host-directory-picker-wsl/known-limitations-and-deferred-work/dev-note:
+  en: 0aca317b6589ea1f
+  zh: 9707df463275b25f

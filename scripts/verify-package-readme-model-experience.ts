@@ -62,6 +62,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/experimental/worktree': { kind: 'indirect', reason: 'The worktree tool renders creation results; the working-directory service owns model-visible directory context.' },
   'packages/ssh/ssh': { kind: 'none', reason: 'The connection owner transports private provider operations; consumers own all model-facing content.' },
   'packages/ssh/wsl': { kind: 'none', reason: 'The connection owner transports private provider operations; consumers own all model-facing content.' },
+  'packages/host/directory-picker-wsl': { kind: 'none', reason: 'The browse backend returns directory listings to the workspace UI without contributing model context.' },
   'packages/bundle/wsl': { kind: 'none', reason: 'The bundle only composes execution providers; consumers own all model-facing content.' },
   'packages/ssh/fs-ssh': { kind: 'indirect', reason: 'The remote filesystem delegates model rendering to the existing filesystem consumers.' },
   'packages/ssh/subprocess-ssh': { kind: 'indirect', reason: 'The remote process provider delegates model rendering to Bash, terminal, LSP and ptc-runtime consumers.' },

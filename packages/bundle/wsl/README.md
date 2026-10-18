@@ -35,6 +35,8 @@ The bundle is a patch layer, not a runtime plugin. Its rows are patched in after
 
 Every deployment coordinate resolves from explicit configuration first and falls back to the environment: `DSH_WSL_EXE`, `DSH_WSL_DISTRO`, `DSH_WSL_WORKSPACE`, `DSH_WSL_HELPER`, `DSH_WSL_NODE`, `DSH_WSL_NODE_ARGS` (a JSON string array) and `DSH_WSL_HELPER_HASH`. The environment cannot select the self-contained executable launch; configure `launch` explicitly for that deployment. The sandbox policy needs the same Linux workspace: its `workspaceRoot` here comes from `DSH_WSL_WORKSPACE` and fails the load when that is unset, so a profile that configures `wsl-ssh.workspace` explicitly must also patch the `sandbox-policy` row with the same directory.
 
+The bundle also replaces the adaptive host directory picker with the WSL browse backend and its existing in-app dialog, so workspace selection lists distribution directories instead of host drives.
+
 The host must provide WSL2 with localhost forwarding and a distribution containing the helper (a Node executable plus the helper entry, or a self-contained executable). See [`dsh-wsl`](../../ssh/wsl/README.md) for the connection contract and failure behavior.
 
 -----

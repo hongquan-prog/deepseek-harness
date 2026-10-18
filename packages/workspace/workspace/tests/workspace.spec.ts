@@ -39,6 +39,15 @@ interface HarnessOptions {
   liveSessions?: SessionHeader[]
   sessionStore?: boolean
   backend?: StorageBackend
+  /** Registry class override for platform-specific path routing tests. */
+  registryClass?: typeof WorkspaceRegistry
+  /** Mounted filesystem service (a plain capability object in tests). */
+  fs?: unknown
+}
+
+/** Registry that classifies paths as Windows would, for remote-namespace coverage. */
+class Win32Registry extends WorkspaceRegistry {
+  protected override hostPlatform(): NodeJS.Platform { return 'win32' }
 }
 
 /** Boot the real storage/domain/registry composition over controllable header-only peers. */
@@ -57,6 +66,7 @@ async function harness(options: HarnessOptions = {}) {
   const open = vi.fn(() => { throw new Error('event bodies must not be opened') })
   const stat = vi.fn(() => { throw new Error('per-session stat must not be needed') })
   ctx.provide('sessionPersistence', { list, open, stat } as never)
+  if (options.fs !== undefined) ctx.provide('fs', options.fs as never)
 
   if (options.sessionStore === true) {
     await ctx.plugin(SessionStore)
@@ -70,7 +80,7 @@ async function harness(options: HarnessOptions = {}) {
 
   const changes: DomainChanged[] = []
   ctx.on('domain/changed', (change) => { changes.push(change) })
-  const fiber = await ctx.plugin(WorkspaceRegistry)
+  const fiber = await ctx.plugin(options.registryClass ?? WorkspaceRegistry)
   const initChanges = [...changes]
   changes.length = 0
   return {
@@ -815,15 +825,15 @@ describe('header-validated membership projection', () => {
     expect(fresh.registry.list()).toEqual([])
   })
 
-  it('preserves an owned session when the directory disappears between realpath and stat', async () => {
+  it('preserves an owned session when the directory is missing during reindexing', async () => {
     const dir = await makeDir('stat-missing')
     const id = WorkspaceId('stat-missing-workspace')
     const pool = storedPool([[id, record(dir, ['kept'])]], { initialized: true, workspaceIds: [id] })
-    const normalize = workspacePaths.realpathNormalize
-    const spy = vi.spyOn(workspacePaths, 'realpathNormalize').mockImplementation(async (path) => {
-      const canonical = await normalize(path)
+    const inspect = workspacePaths.inspectWorkspacePath
+    const spy = vi.spyOn(workspacePaths, 'inspectWorkspacePath').mockImplementation(async (fs, path, platform) => {
+      const inspection = await inspect(fs, path, platform)
       if (path === dir) await rm(dir, { recursive: true })
-      return canonical
+      return { path: inspection.path, kind: 'missing' }
     })
     onTestFinished(() => { spy.mockRestore() })
     const result = await harness({ pool, sessions: [header('kept', dir)] })
@@ -835,7 +845,7 @@ describe('header-validated membership projection', () => {
     const dir = await makeDir(`path-error-${code}`)
     const id = WorkspaceId(`path-error-${code}`)
     const pool = storedPool([[id, record(dir, ['invalid'])]], { initialized: true, workspaceIds: [id] })
-    const spy = vi.spyOn(workspacePaths, 'realpathNormalize').mockRejectedValue(Object.assign(new Error(code), { code }))
+    const spy = vi.spyOn(workspacePaths, 'inspectWorkspacePath').mockRejectedValue(Object.assign(new Error(code), { code }))
     onTestFinished(() => { spy.mockRestore() })
     const result = await harness({ pool, sessions: [header('invalid', dir)] })
     onTestFinished(() => result.ctx.fiber.dispose())
@@ -1544,3 +1554,69 @@ declare module '@deepseek-ai/dsh-workspace/types' {
     'probe-items': true
   }
 }
+
+describe('remote workspace namespaces', () => {
+  /** Capability object standing in for a remote filesystem provider. */
+  const remoteFs = (kind: 'directory' | 'file' | 'missing' = 'directory') => ({
+    processPathFromHostPath: () => undefined,
+    resolve: async (path: string) => ({ targetKey: path, displayPath: path }),
+    processPath: (target: { targetKey: string }) => target.targetKey,
+    stat: async () => kind === 'missing' ? undefined : { type: kind, version: 'v1' },
+  })
+
+  it('creates, attaches and checks a remote workspace through the mounted provider', async () => {
+    const fs = remoteFs()
+    const result = await harness({
+      registryClass: Win32Registry, fs, sessions: [header('remote', '/home/dev/project')],
+    })
+    onTestFinished(() => result.ctx.fiber.dispose())
+    const workspace = await result.registry.create('/home/dev/project')
+    expect(workspace.path).toBe('/home/dev/project')
+    await workspace.attachSession(SessionId('remote'))
+    expect(workspace.sessionIds).toEqual(['remote'])
+    expect(await workspace.status()).toBe('ok')
+    expect(await result.registry.resolveByPath('/home/dev/project')).toBe(workspace)
+  })
+
+  it('rejects remote workspaces that are files and attach when the cwd is missing', async () => {
+    const fileFs = remoteFs('file')
+    const fileResult = await harness({ registryClass: Win32Registry, fs: fileFs })
+    onTestFinished(() => fileResult.ctx.fiber.dispose())
+    await expect(fileResult.registry.create('/home/dev/file')).rejects.toThrow('not a directory')
+    expect(await fileResult.registry.resolveByPath('/home/dev/file')).toBeUndefined()
+
+    const fs = remoteFs()
+    const result = await harness({
+      registryClass: Win32Registry, fs, sessions: [header('remote', '/home/dev/other')],
+    })
+    onTestFinished(() => result.ctx.fiber.dispose())
+    const workspace = await result.registry.create('/home/dev/project')
+    expect(workspace.sessionIds).toEqual([])
+    fs.stat = async () => undefined
+    await expect(workspace.attachSession(SessionId('remote'))).rejects.toThrow('does not resolve')
+  })
+
+  it('initializes a remote default workspace without host mkdir', async () => {
+    const result = await harness({ registryClass: Win32Registry, fs: remoteFs(), liveSessions: [] })
+    onTestFinished(() => result.ctx.fiber.dispose())
+    const workspace = await result.registry.initializeDefault(async () => '/home/dev/project')
+    expect(workspace?.path).toBe('/home/dev/project')
+
+    const missing = await harness({ registryClass: Win32Registry, fs: remoteFs('missing'), liveSessions: [] })
+    onTestFinished(() => missing.ctx.fiber.dispose())
+    await expect(missing.registry.initializeDefault(async () => '/home/dev/missing'))
+      .rejects.toThrow('not a directory')
+  })
+
+  it('keeps drive-less host spellings invalid when the provider maps them locally', async () => {
+    const localFs = {
+      processPathFromHostPath: (path: string) => path,
+      resolve: async (path: string) => ({ targetKey: path, displayPath: path }),
+      processPath: (target: { targetKey: string }) => target.targetKey,
+      stat: async () => ({ type: 'directory', version: 'v1' }),
+    }
+    const result = await harness({ registryClass: Win32Registry, fs: localFs })
+    onTestFinished(() => result.ctx.fiber.dispose())
+    await expect(result.registry.create('/foo')).rejects.toThrow('not fully qualified')
+  })
+})

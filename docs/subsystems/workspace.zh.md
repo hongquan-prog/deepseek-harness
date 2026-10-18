@@ -581,9 +581,9 @@ unpinSession(sessionId: SessionId): Promise<void>
 
 /**
  * Resolve by canonical directory path without creating or mutating a
- * workspace. A missing path rejects during `realpath`; an existing unowned
- * directory returns `undefined`.
- * @param path - Existing directory path in a fully qualified spelling.
+ * workspace. A path missing from the host namespace rejects during
+ * `realpath`; a non-directory or missing remote path returns `undefined`.
+ * @param path - Directory path in the spelling its namespace accepts.
  * @returns the workspace owning the canonical path, when one exists.
  */
 async resolveByPath(path: string): Promise<Workspace | undefined>

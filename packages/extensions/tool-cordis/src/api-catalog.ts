@@ -3979,8 +3979,8 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async resolveByPath(path: string): Promise<Workspace | undefined>',
-        description: 'Resolve by canonical directory path without creating or mutating a workspace. A missing path rejects during `realpath`; an existing unowned directory returns `undefined`.',
-        parameters: [{ name: 'path', description: 'Existing directory path in a fully qualified spelling.' }],
+        description: 'Resolve by canonical directory path without creating or mutating a workspace. A path missing from the host namespace rejects during `realpath`; a non-directory or missing remote path returns `undefined`.',
+        parameters: [{ name: 'path', description: 'Directory path in the spelling its namespace accepts.' }],
         returns: 'the workspace owning the canonical path, when one exists.',
       },
     ],

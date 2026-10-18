@@ -6,16 +6,20 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, stat } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
+import type {} from '@deepseek-ai/dsh-fs'
 import type { DomainGlobal, KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { WorkspaceEntity } from './entity.ts'
 import type { WorkspaceEntityHost } from './entity.ts'
 
 export { WorkspaceMoveInvalidError } from './entity.ts'
-import { defaultWorkspaceTitle, fullyQualifiedWorkspacePath, realpathNormalize } from './paths.ts'
+import {
+  defaultWorkspaceTitle, fullyQualifiedWorkspacePath, inspectWorkspacePath,
+  remoteProviderPath, remoteWorkspacePath, type WorkspacePathInspection,
+} from './paths.ts'
 import { workspaceDomainSpec } from './spec.ts'
 import type { WorkspaceDomainState, WorkspaceRecord } from './spec.ts'
 import type { SessionActivity, Workspace, WorkspaceId as WorkspaceIdBrand } from './types.ts'
@@ -189,10 +193,19 @@ export class WorkspaceRegistry extends Service {
       this.missingSessionPaths.delete(id)
       this.invalidSessionPaths.delete(id)
     },
+    inspectSessionCwd: async path => await this.inspectPath(path),
   }
 
   constructor(ctx: Context) {
     super(ctx, 'workspaceRegistry')
+  }
+
+  /** Host platform used to classify workspace paths; overridden only by platform tests. */
+  protected hostPlatform(): NodeJS.Platform { return process.platform }
+
+  /** Inspect one path in the namespace its provider owns. */
+  private async inspectPath(path: string): Promise<WorkspacePathInspection> {
+    return await inspectWorkspacePath(this.ctx.get('fs'), path, this.hostPlatform())
   }
 
   /** Open the domain, finish bootstrap when required, and rebuild the ordered cache. */
@@ -236,11 +249,11 @@ export class WorkspaceRegistry extends Service {
   // drop the parameter with its @param clause and the `create(path, title?)`
   // lines in this package's README pair.
   async create(path: string, title?: string): Promise<Workspace> {
-    const canonical = await realpathNormalize(path)
-    if (!(await stat(canonical)).isDirectory()) {
-      throw new Error(`cannot create a workspace at '${canonical}': path is not a directory`)
+    const inspection = await this.inspectPath(path)
+    if (inspection.kind !== 'directory') {
+      throw new Error(`cannot create a workspace at '${inspection.path}': path is not a directory`)
     }
-    return await this.enqueueOperation(() => this.createCanonical(canonical, title))
+    return await this.enqueueOperation(() => this.createCanonical(inspection.path, title))
   }
 
   /**
@@ -265,12 +278,18 @@ export class WorkspaceRegistry extends Service {
         || sessions.list().length > 0 || (await this.listStoredHeaders()).length > 0) return undefined
 
       const path = await resolveDirectory()
-      if (!fullyQualifiedWorkspacePath(path)) throw new TypeError(`Workspace path is not fully qualified: '${path}'`)
-      await mkdir(path, { recursive: true })
-      const canonical = await realpathNormalize(path)
+      const platform = this.hostPlatform()
+      if (!fullyQualifiedWorkspacePath(path, platform) && !remoteWorkspacePath(path, platform)) {
+        throw new TypeError(`Workspace path is not fully qualified: '${path}'`)
+      }
+      if (!remoteProviderPath(this.ctx.get('fs'), path, platform)) await mkdir(path, { recursive: true })
+      const inspection = await this.inspectPath(path)
+      if (inspection.kind !== 'directory') {
+        throw new Error(`cannot create a workspace at '${inspection.path}': path is not a directory`)
+      }
       // A Session can start outside the registry queue while directory preparation awaits I/O.
       if ((await this.listStoredHeaders()).length > 0 || sessions.list().length > 0) return undefined
-      return this.createCanonical(canonical, defaultWorkspaceTitle(path), true)
+      return this.createCanonical(inspection.path, defaultWorkspaceTitle(path, platform), true)
     })
   }
 
@@ -494,15 +513,16 @@ export class WorkspaceRegistry extends Service {
 
   /**
    * Resolve by canonical directory path without creating or mutating a
-   * workspace. A missing path rejects during `realpath`; an existing unowned
-   * directory returns `undefined`.
-   * @param path - Existing directory path in a fully qualified spelling.
+   * workspace. A path missing from the host namespace rejects during
+   * `realpath`; a non-directory or missing remote path returns `undefined`.
+   * @param path - Directory path in the spelling its namespace accepts.
    * @returns the workspace owning the canonical path, when one exists.
    */
   async resolveByPath(path: string): Promise<Workspace | undefined> {
-    const canonical = await realpathNormalize(path)
+    const inspection = await this.inspectPath(path)
+    if (inspection.kind !== 'directory') return undefined
     for (const entity of this.entities.values()) {
-      if (entity.path === canonical) return entity
+      if (entity.path === inspection.path) return entity
     }
     return undefined
   }
@@ -512,7 +532,7 @@ export class WorkspaceRegistry extends Service {
       if (entity.path === canonical) return entity
     }
 
-    const workspaceName = title ?? defaultWorkspaceTitle(canonical)
+    const workspaceName = title ?? defaultWorkspaceTitle(canonical, this.hostPlatform())
     const table = this.requireTable()
     const state = this.requireState()
     const id = WorkspaceId(randomUUID())
@@ -813,12 +833,16 @@ export class WorkspaceRegistry extends Service {
       return
     }
     try {
-      const path = await realpathNormalize(header.cwd)
-      if (!(await stat(path)).isDirectory()) {
+      const inspection = await this.inspectPath(header.cwd)
+      if (inspection.kind === 'missing') {
+        this.missingSessionPaths.add(header.id)
+        return
+      }
+      if (inspection.kind !== 'directory') {
         this.invalidSessionPaths.set(header.id, `cwd '${header.cwd}' is not a directory`)
         return
       }
-      this.sessionPaths.set(header.id, path)
+      this.sessionPaths.set(header.id, inspection.path)
       this.invalidSessionPaths.delete(header.id)
     } catch (error) {
       if (fullyQualifiedWorkspacePath(header.cwd)

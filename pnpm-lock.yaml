@@ -3130,9 +3130,15 @@ importers:
 
   packages/bundle/wsl:
     dependencies:
+      '@deepseek-ai/dsh-client-ui-directory-picker-browse':
+        specifier: workspace:*
+        version: link:../../client/ui-directory-picker-browse
       '@deepseek-ai/dsh-fs-ssh':
         specifier: workspace:*
         version: link:../../ssh/fs-ssh
+      '@deepseek-ai/dsh-host-directory-picker-wsl':
+        specifier: workspace:*
+        version: link:../../host/directory-picker-wsl
       '@deepseek-ai/dsh-sandbox-ssh':
         specifier: workspace:*
         version: link:../../ssh/sandbox-ssh
@@ -10570,6 +10576,28 @@ importers:
         specifier: ^4.23.13
         version: 4.23.13
 
+  packages/host/directory-picker-wsl:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-fs':
+        specifier: workspace:*
+        version: link:../../fs/fs
+      '@deepseek-ai/dsh-host-directory-picker':
+        specifier: workspace:*
+        version: link:../directory-picker
+      '@deepseek-ai/dsh-ssh':
+        specifier: workspace:*
+        version: link:../../ssh/ssh
+
   packages/host/frontend-static:
     dependencies:
       '@deepseek-ai/schemastery':
@@ -15522,6 +15550,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-fs':
+        specifier: workspace:*
+        version: link:../../fs/fs
       '@deepseek-ai/dsh-session':
         specifier: workspace:*
         version: link:../../core/session

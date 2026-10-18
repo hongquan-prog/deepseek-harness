@@ -219,6 +219,7 @@
       "@deepseek-ai/dsh-host-directory-picker-native": ["./packages/host/directory-picker-native/src"],
       "@deepseek-ai/dsh-host-directory-picker-native/*": ["./packages/host/directory-picker-native/src/*"],
       "@deepseek-ai/dsh-host-directory-picker-auto": ["./packages/host/directory-picker-auto/src"],
+      "@deepseek-ai/dsh-host-directory-picker-wsl": ["./packages/host/directory-picker-wsl/src"],
       "@deepseek-ai/dsh-host-directory-picker-auto/*": ["./packages/host/directory-picker-auto/src/*"],
       "@deepseek-ai/dsh-host-product-telemetry-otel": ["./packages/host/product-telemetry-otel/src"],
       "@deepseek-ai/dsh-host-open-in-app": ["./packages/host/open-in-app/src"],
