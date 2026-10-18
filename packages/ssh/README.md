@@ -24,6 +24,7 @@ This family runs files, ordinary processes, terminals and sandbox enforcement on
 |---|---|---|
 | [`ssh`](ssh/README.md) | Connection, helper identity and transport lifecycle | `ctx.ssh` |
 | [`ssh-helper-runtime`](ssh-helper-runtime/README.md) | Private Node-free executable distribution | — |
+| [`wsl`](wsl/README.md) | WSL distribution connection over `wsl.exe` and loopback streams | `ctx.ssh` |
 | [`fs-ssh`](fs-ssh/README.md) | Remote file identity, reads and guarded atomic mutations | `ctx.fs` |
 | [`subprocess-ssh`](subprocess-ssh/README.md) | Executable lookup, processes, control streams and terminals | `ctx.subprocess` |
 | [`sandbox-ssh`](sandbox-ssh/README.md) | Remote file-effect confinement and enforcement facts | `ctx.sandbox` |

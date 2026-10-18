@@ -2923,29 +2923,34 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'ssh',
-    summary: 'One non-reconnecting SSH session; loss invalidates all active operations.',
-    description: 'One non-reconnecting SSH session; loss invalidates all active operations.',
+    summary: 'One version-matched helper connection consumed by the filesystem, subprocess and sandbox providers.',
+    description: 'One version-matched helper connection consumed by the filesystem, subprocess and sandbox providers.',
     methods: [
       {
-        signature: 'readonly ready: Promise<Hello>',
-        description: 'Verified remote helper coordinates; callers must await this before launch.',
+        signature: 'readonly ready: Promise<SshHello>',
+        description: 'Verified helper coordinates; callers await this before remote work.',
         parameters: [],
       },
       {
-        signature: 'async request<T>(method: string, params: unknown, result: z.ZodType<T>, signal?: AbortSignal, wait: boolean = false): Promise<T>',
-        description: 'Send a helper operation; cancellation never replays an ambiguous mutation.',
-        parameters: [{ name: 'method', description: 'the private helper operation.' }, { name: 'params', description: 'JSON request fields validated by the helper.' }, { name: 'result', description: 'response validation before returning provider-visible data.' }, { name: 'signal', description: 'cancellation, which does not undo completed remote effects.' }, { name: 'wait', description: 'allow a process observation to outlast the administrative deadline.' }],
+        signature: 'request<T>(method: string, params: unknown, result: z.ZodType<T>, signal?: AbortSignal, wait?: boolean): Promise<T>',
+        description: 'Send one administrative request.',
+        parameters: [{ name: 'method', description: 'the private helper operation.' }, { name: 'params', description: 'JSON request fields validated by the helper.' }, { name: 'result', description: 'validation for the remote response.' }, { name: 'signal', description: 'cancellation; completed remote effects are not rolled back.' }, { name: 'wait', description: 'allow a process observation to outlast the administrative deadline.' }],
         returns: 'the validated remote result.',
       },
       {
-        signature: 'async connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket>',
-        description: 'Forward one authenticated stream through an independent SSH channel.',
-        parameters: [{ name: 'endpoint', description: 'private coordinates issued by this connection\'s helper.' }, { name: 'signal', description: 'cancellation of allocation and the resulting socket.' }],
+        signature: 'connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket>',
+        description: 'Open one authenticated stream endpoint published by this connection\'s helper.',
+        parameters: [{ name: 'endpoint', description: 'private coordinates issued by the helper.' }, { name: 'signal', description: 'cancellation of stream allocation and the resulting socket.' }],
         returns: 'a paused socket; attach a consumer before resuming it.',
       },
       {
+        signature: 'readonly ptcLaunch: HelperPtcLaunch',
+        description: 'PTC launch configuration; implementations throw when their helper carries no runtime.',
+        parameters: [],
+      },
+      {
         signature: 'dispose(): Promise<void>',
-        description: 'Tear down the helper\'s remote managed ranges before releasing the SSH master when reachable.',
+        description: 'Release helper-owned resources and transport.',
         parameters: [],
       },
     ],
@@ -5622,6 +5627,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface GrantRecord {\n    readonly kind: \'grant\';\n    readonly payload: unknown;\n}',
   },
   {
+    name: 'HelperPtcLaunch',
+    declaration: 'export type HelperPtcLaunch = {\n    kind: \'embedded\';\n    executable: string;\n} | {\n    kind: \'node-script\';\n    executable: string;\n    bootstrapPath: string;\n};',
+  },
+  {
     name: 'HookBudget',
     declaration: 'export interface HookBudget {\n    readonly ms: number;\n    readonly remainingMs: number;\n}',
   },
@@ -7796,6 +7805,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SpillSource',
     declaration: 'export type SpillSource = {\n    kind: \'tool\';\n    toolName: string;\n    callId: ToolCallId;\n    label: string;\n} | {\n    kind: \'session-reference\';\n    sessionId: SessionId;\n    label: string;\n};',
+  },
+  {
+    name: 'SshHello',
+    declaration: 'export type SshHello = z.infer<typeof helloSchema>;',
   },
   {
     name: 'SshStreamEndpoint',

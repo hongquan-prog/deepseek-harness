@@ -73,7 +73,7 @@ interface Config {
 
 ```ts public-api
 /** One non-reconnecting SSH session; loss invalidates all active operations. */
-declare class SshConnection extends Service {
+declare class SshConnection extends Service implements SshService {
   static Config: schema<Config>;
   /** Verified remote helper coordinates; callers must await this before launch. */
   readonly ready: Promise<Hello>;
@@ -81,7 +81,7 @@ declare class SshConnection extends Service {
   /** Hold plugin readiness until the remote identity and helper digest are verified. */
   async [Service.init](): Promise<void>;
   /** Verified remote PTC launch configuration; script deployments require a verified bootstrap. */
-  get ptcLaunch(): { kind: 'embedded'; executable: string } | { kind: 'node-script'; executable: string; bootstrapPath: string };
+  get ptcLaunch(): HelperPtcLaunch;
   /**
      * Send a helper operation; cancellation never replays an ambiguous mutation.
      * @param method - the private helper operation.
@@ -112,35 +112,35 @@ declare class SshConnection extends Service {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
-<a id="ctxssh--sshconnection"></a>
+<a id="ctxssh--sshservice"></a>
 
-### `ctx.ssh` — `SshConnection`
+### `ctx.ssh` — `SshService`
 
-One non-reconnecting SSH session; loss invalidates all active operations.
+One version-matched helper connection consumed by the filesystem, subprocess and sandbox providers.
 
 ```ts cordis-catalog
 /**
- * Send a helper operation; cancellation never replays an ambiguous mutation.
+ * Send one administrative request.
  * @param method - the private helper operation.
  * @param params - JSON request fields validated by the helper.
- * @param result - response validation before returning provider-visible data.
- * @param signal - cancellation, which does not undo completed remote effects.
+ * @param result - validation for the remote response.
+ * @param signal - cancellation; completed remote effects are not rolled back.
  * @param wait - allow a process observation to outlast the administrative deadline.
  * @returns the validated remote result.
  */
-async request<T>(method: string, params: unknown, result: z.ZodType<T>, signal?: AbortSignal, wait: boolean = false): Promise<T>
+request<T>(method: string, params: unknown, result: z.ZodType<T>, signal?: AbortSignal, wait?: boolean): Promise<T>
 
 /**
- * Forward one authenticated stream through an independent SSH channel.
- * @param endpoint - private coordinates issued by this connection's helper.
- * @param signal - cancellation of allocation and the resulting socket.
+ * Open one authenticated stream endpoint published by this connection's helper.
+ * @param endpoint - private coordinates issued by the helper.
+ * @param signal - cancellation of stream allocation and the resulting socket.
  * @returns a paused socket; attach a consumer before resuming it.
  */
-async connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket>
+connectStream(endpoint: SshStreamEndpoint, signal?: AbortSignal): Promise<Socket>
 
-/** Tear down the helper's remote managed ranges before releasing the SSH master when reachable. */
+/** Release helper-owned resources and transport. */
 dispose(): Promise<void>
 ```
 
-Source: [`packages/ssh/ssh/src/index.ts`](../../packages/ssh/ssh/src/index.ts)
+Source: [`packages/ssh/ssh/src/service.ts`](../../packages/ssh/ssh/src/service.ts)
 <!-- END GENERATED cordis-surface -->

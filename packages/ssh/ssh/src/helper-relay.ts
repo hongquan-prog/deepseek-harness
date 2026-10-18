@@ -40,9 +40,9 @@ export class StreamRelays {
    * @returns the loopback port a forwarded client can connect to.
    * @throws when the path is outside the private root or the listener cannot bind.
    */
-  async open(rawPath: string): Promise<{ port: number }> {
-    const path = posix.normalize(rawPath)
-    if (!path.startsWith(`${this.root}/`) || path.includes('\0')) {
+  async open(path: string): Promise<{ port: number }> {
+    const normalized = posix.normalize(path)
+    if (!normalized.startsWith(`${this.root}/`) || normalized.includes('\0')) {
       throw new Error('SSH relay path is outside the helper root')
     }
     if (this.relays.size >= this.maxRelays) throw new Error('SSH relay capacity unavailable')
@@ -50,7 +50,7 @@ export class StreamRelays {
     const server = createServer({ allowHalfOpen: true }, (client) => {
       clearTimeout(relay.timer)
       server.close()
-      const upstream = createConnection({ path, allowHalfOpen: true })
+      const upstream = createConnection({ path: normalized, allowHalfOpen: true })
       sockets.add(client)
       sockets.add(upstream)
       const teardown = (): void => {

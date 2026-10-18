@@ -24,6 +24,7 @@ kind: "package-group"
 |---|---|---|
 | [`ssh`](ssh/README.zh.md) | 连接、辅助程序身份及传输生命周期 | `ctx.ssh` |
 | [`ssh-helper-runtime`](ssh-helper-runtime/README.zh.md) | 无须安装 Node 的私有可执行文件发行包 | — |
+| [`wsl`](wsl/README.zh.md) | 经由 `wsl.exe` 与环回流的 WSL 发行版连接 | `ctx.ssh` |
 | [`fs-ssh`](fs-ssh/README.zh.md) | 远端文件身份、读取及带保护的原子修改 | `ctx.fs` |
 | [`subprocess-ssh`](subprocess-ssh/README.zh.md) | 可执行文件查找、进程、控制流及终端 | `ctx.subprocess` |
 | [`sandbox-ssh`](sandbox-ssh/README.zh.md) | 远端文件效果限制及执行信息 | `ctx.sandbox` |

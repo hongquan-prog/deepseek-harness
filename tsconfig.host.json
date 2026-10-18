@@ -410,6 +410,7 @@
     { "path": "./packages/ssh/fs-ssh" },
     { "path": "./packages/ssh/subprocess-ssh" },
     { "path": "./packages/ssh/sandbox-ssh" },
+    { "path": "./packages/ssh/wsl" },
     { "path": "./packages/subprocess/win32-process" },
     { "path": "./packages/shell/shell" },
     { "path": "./packages/terminal/terminal" },

@@ -11,8 +11,9 @@ import { assertNever } from '@deepseek-ai/dsh-util-values'
 import { SshRpcPeer, SSH_PROTOCOL_VERSION } from './protocol.ts'
 import { helloSchema, type SshStreamEndpoint } from './schemas.ts'
 import { authenticateStream } from './stream-security.ts'
+import type { HelperPtcLaunch, SshHello, SshService } from './service.ts'
 
-type Hello = z.infer<typeof helloSchema>
+type Hello = SshHello
 
 /** Installed helper invocation; script deployments may also install a PTC bootstrap. */
 export type HelperLaunch = {
@@ -52,11 +53,11 @@ export interface Config {
 }
 
 declare module '@deepseek-ai/cordis' {
-  interface Context { ssh: SshConnection }
+  interface Context { ssh: SshService }
 }
 
 /** One non-reconnecting SSH session; loss invalidates all active operations. */
-export class SshConnection extends Service {
+export class SshConnection extends Service implements SshService {
   static Config: schema<Config> = schema.object({
     host: schema.string().required(), helper: schema.string().required(),
     launch: schema.union([
@@ -111,7 +112,7 @@ export class SshConnection extends Service {
   async [Service.init](): Promise<void> { await this.ready }
 
   /** Verified remote PTC launch configuration; script deployments require a verified bootstrap. */
-  get ptcLaunch(): { kind: 'embedded'; executable: string } | { kind: 'node-script'; executable: string; bootstrapPath: string } {
+  get ptcLaunch(): HelperPtcLaunch {
     if (this.remote === undefined) throw new Error('SSH helper is not ready')
     const launch = this.config.launch
     switch (launch.kind) {
@@ -328,4 +329,5 @@ export class SshConnection extends Service {
   }
 }
 
+export type { HelperPtcLaunch, SshHello, SshService } from './service.ts'
 export default SshConnection

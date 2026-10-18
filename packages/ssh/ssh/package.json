@@ -31,6 +31,10 @@
     "./schemas": {
       "types": "./lib/types/schemas.d.ts",
       "default": "./lib/schemas.js"
+    },
+    "./stream-security": {
+      "types": "./lib/types/stream-security.d.ts",
+      "default": "./lib/stream-security.js"
     }
   },
   "files": [
@@ -38,6 +42,7 @@
     "lib/helper.js",
     "lib/protocol.js",
     "lib/schemas.js",
+    "lib/stream-security.js",
     "lib/protocol-*.js",
     "lib/schemas-*.js",
     "lib/stream-security-*.js",
