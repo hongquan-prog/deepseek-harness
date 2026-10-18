@@ -77,7 +77,7 @@ loader 补丁不能重命名已有行，因此 bundle 禁用随附的 `subproces
 - **本地包尚未发布** —— `dsh plugin add` 从 registry 解析 bundle 与 provider，因此未发布的版本只能以 link 方式做组合测试。
 - **单发行版、单 helper** —— 多发行版与连接池仍是后续工作。
 - **必须启用 localhost 转发** —— 关闭它的宿主无法访问流中继。
-- **持久终端与新建文件夹尚未接线** —— bundle 启用沙箱化 bash 执行器并禁用宿主 PowerShell 执行器；agent preset 按已挂载执行器的方言选择面向模型的 shell 工具，因此命令经发行版的 subprocess 与 sandbox 运行。持久终端归属与目录选择器的「新建文件夹」仍是后续工作；`createDirectory` 目前以 `directory-create-failed` 拒绝。
+- **新建文件夹与 agent 终端工具仍延后** —— 沙箱化 bash 执行器与 subprocess PTY 传输都在发行版内运行（桌面侧边栏终端跟随已挂载的 `subprocess` provider），agent preset 按执行器方言选择面向模型的 shell 工具。标准 preset 尚未挂载持久终端服务及其工具；目录选择器的「新建文件夹」仍以 `directory-create-failed` 拒绝。
 - **工作区仍需手工选择** —— `DSH_WSL_WORKSPACE` 与沙箱策略必须指向同一个 Linux 目录。应用内选择器与文件监听已接线；选择器暂不能新建文件夹。
 
 <a id="dev-note"></a>
