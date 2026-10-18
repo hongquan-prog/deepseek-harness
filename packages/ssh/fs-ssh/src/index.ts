@@ -7,7 +7,8 @@ import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandb
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type {} from '@deepseek-ai/dsh-ssh'
 import { RemoteOperationError } from '@deepseek-ai/dsh-ssh/protocol'
-import { editResultSchema, entriesSchema, infoSchema, pathInfoSchema, targetSchema, textStreamIdSchema, writeResultSchema } from '@deepseek-ai/dsh-ssh/schemas'
+import { editResultSchema, entriesSchema, infoSchema, pathInfoSchema, targetSchema, textStreamIdSchema, watchChangeSchema, watchIdSchema, writeResultSchema } from '@deepseek-ai/dsh-ssh/schemas'
+import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 
 const errorCodes: Record<FsErrorCode, true> = {
@@ -35,6 +36,61 @@ export class SshFileSystem extends FileSystem {
   override contains(parent: FsTarget, child: FsTarget): boolean {
     const path = posix.relative(this.processPath(parent), this.processPath(child))
     return path === '' || (!path.startsWith('../') && path !== '..' && !posix.isAbsolute(path))
+  }
+
+  /**
+   * Observe one remote file or directory through bounded administrative polls.
+   * @param target - resolved remote file or directory, including an absent path.
+   * @param changed - invalidation callback; transport failures arrive as an error.
+   * @param signal - cancels watch initialization; the returned close stops it.
+   * @returns the asynchronous close function for the initialized watch.
+   */
+  override async watch(target: FsTarget, changed: (error?: Error) => void, signal: AbortSignal): Promise<() => Promise<void>> {
+    // The id is client-owned so an aborted open can still close the remote watch.
+    const requested = watchIdSchema.parse(randomUUID())
+    let id = requested
+    try {
+      const opened = await this.call('fs.watchOpen', { id: requested, target }, z.object({ id: watchIdSchema }).strict(), signal)
+      id = opened.id
+    } catch (error) {
+      void this.call('fs.watchClose', { id: requested }, z.null()).catch(() => {})
+      throw error
+    }
+    if (signal.aborted) {
+      await this.call('fs.watchClose', { id }, z.null()).catch(() => {})
+      throw new FsError('watch initialization cancelled', 'FS_ABORTED', { cause: signal.reason })
+    }
+    const lifetime = new AbortController()
+    const abort = (): void => {
+      lifetime.abort(signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason)))
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    const stopped = (): boolean => lifetime.signal.aborted
+    const idleTimeout = (error: unknown): boolean => {
+      const cause = (error as Error).cause
+      return typeof cause === 'object' && cause !== null && 'name' in cause && cause.name === 'TimeoutError'
+    }
+    const polling = (async () => {
+      while (!stopped()) {
+        try {
+          const event = await this.call('fs.watchNext', { id }, watchChangeSchema, lifetime.signal)
+          if (event.changed) changed()
+        } catch (error) {
+          if (stopped()) return
+          // A poll may outlive a request timeout shorter than the helper's idle
+          // bound; an idle retry is not a transport failure.
+          if (idleTimeout(error)) continue
+          changed(error as Error)
+          return
+        }
+      }
+    })()
+    return async () => {
+      abort()
+      signal.removeEventListener('abort', abort)
+      await this.call('fs.watchClose', { id }, z.null()).catch(() => {})
+      await polling
+    }
   }
 
   override async stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefined> {

@@ -67,7 +67,7 @@ This provider contributes no request-prefix content. Its consumers own model-vis
 <a id="known-limitations-and-deferred-work"></a>
 
 - Whole-text reads and individual byte windows are limited to 8 MiB by the helper. Use text streaming or multiple byte windows for larger reads; other JSON transfers also obey the connection’s frame cap.
-- Filesystem watching is unsupported: the provider keeps no `watch()` override, so the base `FS_IO_ERROR` rejection applies without polling or opening a local watcher for a remote path. Ordinary reads and consumer-owned manual refresh remain available.
+- Filesystem watching is supported through bounded administrative polls: the helper watches the remote path and each `fs.watchNext` answers on the next invalidation or after a 20-second idle bound. A helper accepts at most 128 watched paths and one pending poll per watch. Notifications are invalidations without event detail, watching is non-recursive (a directory reports direct-entry changes), and a transport failure reaches the invalidation callback as an error. An absent target is observed through its parent directory; sibling changes may report an invalidation too (over-invalidation, never a missed creation).
 - Remote file URLs are execution coordinates, not host filesystem handles or Web download links.
 
 <a id="dev-note"></a>

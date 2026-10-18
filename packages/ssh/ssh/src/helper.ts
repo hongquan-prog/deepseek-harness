@@ -13,10 +13,11 @@ import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection'
 import type { SandboxExecutionPolicy, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
 import { z } from 'zod'
-import { SshRpcPeer, RemoteOperationError, SSH_MAX_PROCESS_HANDLES, SSH_MAX_TEXT_STREAMS, SSH_PROTOCOL_VERSION } from './protocol.ts'
+import { SshRpcPeer, RemoteOperationError, SSH_MAX_PROCESS_HANDLES, SSH_MAX_TEXT_STREAMS, SSH_MAX_WATCHES, SSH_PROTOCOL_VERSION } from './protocol.ts'
 import { RemoteProcesses } from './helper-processes.ts'
+import { RemoteWatches } from './helper-watch.ts'
 import { StreamRelays } from './helper-relay.ts'
-import { editSchema, environmentSchema, intentSchema, policySchema, processIdSchema, remotePath, targetSchema, textStreamIdSchema } from './schemas.ts'
+import { editSchema, environmentSchema, intentSchema, policySchema, processIdSchema, remotePath, targetSchema, textStreamIdSchema, watchIdSchema } from './schemas.ts'
 import type { SshTextStreamId } from './schemas.ts'
 
 const MAX_FRAME_BYTES = 64 * 1024 * 1024
@@ -61,6 +62,7 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
   const root = await mkdtemp('/tmp/dsh-ssh-')
   const processes = new RemoteProcesses(ctx, root, SSH_MAX_PROCESS_HANDLES, 30_000)
   const relays = new StreamRelays(root)
+  const watches = new RemoteWatches(SSH_MAX_WATCHES)
   const lifetime = new AbortController()
   const iterators = new Map<SshTextStreamId, { iterator: AsyncIterator<string>; controller: AbortController }>()
   let lease: NodeJS.Timeout | undefined
@@ -75,7 +77,7 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
       for (const record of iterators.values()) record.controller.abort(lifetime.signal.reason)
       await Promise.allSettled([...iterators.values()].map(async record => record.iterator.return?.()))
       iterators.clear()
-      try { await relays.close(); await processes.close() }
+      try { await watches.closeAll(); await relays.close(); await processes.close() }
       finally {
         try { await runtime.close() }
         finally { await rm(root, { recursive: true, force: true }) }
@@ -116,6 +118,20 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
     if (method === 'stream.relay') {
       const input = z.object({ path: remotePath }).strict().parse(raw)
       return relays.open(input.path)
+    }
+    if (method === 'fs.watchOpen') {
+      const input = z.object({ id: watchIdSchema, target: targetSchema }).strict().parse(raw)
+      watches.open(input.id, input.target.targetKey)
+      return { id: input.id }
+    }
+    if (method === 'fs.watchNext') {
+      const { id } = z.object({ id: watchIdSchema }).strict().parse(raw)
+      return await watches.next(id, signal)
+    }
+    if (method === 'fs.watchClose') {
+      const { id } = z.object({ id: watchIdSchema }).strict().parse(raw)
+      watches.close(id)
+      return null
     }
     if (method === 'heartbeat') { object.parse(raw); touchLease(); return null }
     if (method === 'close') { object.parse(raw); await close(); return null }

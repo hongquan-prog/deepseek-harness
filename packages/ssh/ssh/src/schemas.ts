@@ -5,12 +5,18 @@ import { SSH_PROTOCOL_VERSION } from './protocol.ts'
 
 /** Identity of one prepared or running process in its owning SSH helper. */
 export type SshProcessId = Branded<'SshProcessId'>
+/** Identity of one open path watch in its owning SSH helper. */
+export type SshWatchId = Branded<'SshWatchId'>
 /** Identity of one open text iterator in its owning SSH helper. */
 export type SshTextStreamId = Branded<'SshTextStreamId'>
 /** Admit a process identity from the private helper protocol. */
 export const processIdSchema = z.uuid().transform((value): SshProcessId => value as SshProcessId)
 /** Admit a text iterator identity from the private helper protocol. */
 export const textStreamIdSchema = z.uuid().transform((value): SshTextStreamId => value as SshTextStreamId)
+/** Admit a watch identity from the private helper protocol. */
+export const watchIdSchema = z.uuid().transform((value): SshWatchId => value as SshWatchId)
+/** Whether one bounded watch poll observed an invalidation. */
+export const watchChangeSchema = z.object({ changed: z.boolean() }).strict()
 
 /** A remote POSIX absolute path; spelling is preserved until remote canonicalization. */
 export const remotePath = z.string().min(1).refine(value => value.startsWith('/') && !value.includes('\0'), 'expected an absolute POSIX path')

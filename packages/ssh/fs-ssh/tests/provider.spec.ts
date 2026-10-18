@@ -31,11 +31,133 @@ async function setup() {
 }
 
 describe('SSH filesystem provider', () => {
-  it('declares watching unsupported without sending a remote request', async () => {
+  it('forwards watch polling and unwatch requests to the helper', async () => {
     const { fs, dispatch } = await setup()
-    await expect(fs.watch(target, vi.fn(), new AbortController().signal))
-      .rejects.toMatchObject({ code: 'FS_IO_ERROR' })
-    expect(dispatch).not.toHaveBeenCalled()
+    let polls = 0
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') return { id: streamId }
+      if (method === 'fs.watchNext') {
+        const changed = polls++ === 0
+        if (!changed) await new Promise((resolve) => { setTimeout(resolve, 5) })
+        return { changed }
+      }
+      return null
+    })
+    const changed = vi.fn()
+    const stop = await fs.watch(target, changed, new AbortController().signal)
+    await expect.poll(() => changed.mock.calls.length).toBeGreaterThan(0)
+    await stop()
+    const openCall = dispatch.mock.calls.find(([method]) => method === 'fs.watchOpen')
+    expect(openCall?.[1]).toMatchObject({ target })
+    expect(dispatch).toHaveBeenCalledWith('fs.watchClose', { id: streamId }, undefined)
+  })
+
+  it('reports a failed poll through the invalidation callback and rejects a failed open', async () => {
+    const { fs, dispatch } = await setup()
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') return { id: streamId }
+      if (method === 'fs.watchNext') throw new RemoteOperationError('watch transport lost')
+      return null
+    })
+    const failure = vi.fn()
+    const stop = await fs.watch(target, failure, new AbortController().signal)
+    await expect.poll(() => failure.mock.calls.length).toBeGreaterThan(0)
+    expect(failure.mock.calls[0]?.[0]).toMatchObject({ message: 'watch transport lost' })
+    await stop()
+
+    dispatch.mockRejectedValue(new RemoteOperationError('open refused'))
+    await expect(fs.watch(target, vi.fn(), new AbortController().signal)).rejects.toMatchObject({ code: 'FS_IO_ERROR' })
+  })
+
+  it('treats a non-Error poll rejection as a transport failure and closes through a rejected close', async () => {
+    const { fs, dispatch } = await setup()
+    let polls = 0
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') return { id: streamId }
+      if (method === 'fs.watchNext') {
+        if (polls++ === 0) throw 'plain transport failure'
+        await new Promise((resolve) => { setTimeout(resolve, 5) })
+        return { changed: false }
+      }
+      throw new RemoteOperationError('close refused')
+    })
+    const failure = vi.fn()
+    const stop = await fs.watch(target, failure, new AbortController().signal)
+    await expect.poll(() => failure.mock.calls.length).toBeGreaterThan(0)
+    expect(failure.mock.calls[0]?.[0]).toMatchObject({ message: 'plain transport failure' })
+    await stop()
+  })
+
+  it('closes the remote watch when the caller aborts during or right after opening', async () => {
+    const { fs, dispatch } = await setup()
+    const cancelled = new AbortController()
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') {
+        cancelled.abort(new Error('late cancellation'))
+        return { id: streamId }
+      }
+      if (method === 'fs.watchClose') throw new RemoteOperationError('close refused')
+      return null
+    })
+    await expect(fs.watch(target, vi.fn(), cancelled.signal)).rejects.toMatchObject({ code: 'FS_ABORTED' })
+    expect(dispatch).toHaveBeenCalledWith('fs.watchClose', { id: streamId }, undefined)
+
+    const stringReason = new AbortController()
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') {
+        stringReason.abort('string cancellation')
+        return { id: streamId }
+      }
+      return null
+    })
+    await expect(fs.watch(target, vi.fn(), stringReason.signal)).rejects.toMatchObject({ code: 'FS_ABORTED' })
+  })
+
+  it('closes the requested id when the open call itself fails or is cancelled', async () => {
+    const { fs, dispatch } = await setup()
+    dispatch.mockRejectedValue(new RemoteOperationError('open cancelled'))
+    await expect(fs.watch(target, vi.fn(), new AbortController().signal)).rejects.toMatchObject({ code: 'FS_IO_ERROR' })
+    await expect.poll(() => dispatch.mock.calls.some(([method, params]) =>
+      method === 'fs.watchClose' && typeof params === 'object' && params !== null && 'id' in params)).toBe(true)
+  })
+
+  it('stops polling when the caller aborts after initialization', async () => {
+    const { fs, dispatch } = await setup()
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') return { id: streamId }
+      if (method === 'fs.watchNext') {
+        await new Promise((resolve) => { setTimeout(resolve, 5) })
+        return { changed: false }
+      }
+      return null
+    })
+    const cancelled = new AbortController()
+    const changed = vi.fn()
+    const stop = await fs.watch(target, changed, cancelled.signal)
+    cancelled.abort(new Error('late abort'))
+    await stop()
+    expect(changed).not.toHaveBeenCalled()
+  })
+
+  it('retries a poll that outlived a shorter request timeout', async () => {
+    const { fs, dispatch } = await setup()
+    let polls = 0
+    dispatch.mockImplementation(async (method) => {
+      if (method === 'fs.watchOpen') return { id: streamId }
+      if (method === 'fs.watchNext') {
+        const call = polls++
+        if (call === 0) throw new DOMException('request exceeded its timeout', 'TimeoutError')
+        if (call === 1) return { changed: true }
+        await new Promise((resolve) => { setTimeout(resolve, 5) })
+        return { changed: false }
+      }
+      return null
+    })
+    const changed = vi.fn()
+    const stop = await fs.watch(target, changed, new AbortController().signal)
+    await expect.poll(() => changed.mock.calls.length).toBeGreaterThan(0)
+    expect(changed.mock.calls[0]).toEqual([])
+    await stop()
   })
 
   it.each([

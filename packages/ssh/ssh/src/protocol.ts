@@ -17,18 +17,23 @@ export const SSH_PROTOCOL_VERSION = 2
 export const SSH_MAX_PROCESS_HANDLES = 128
 /** Maximum open text iterators owned by one helper. */
 export const SSH_MAX_TEXT_STREAMS = 128
+/** Maximum open path watches owned by one helper. */
+export const SSH_MAX_WATCHES = 128
 
 const managementLimits = {
   heartbeat: 1,
   close: 1,
   'process.terminate': SSH_MAX_PROCESS_HANDLES,
   'fs.streamClose': SSH_MAX_TEXT_STREAMS,
+  'fs.watchNext': SSH_MAX_WATCHES,
+  'fs.watchClose': SSH_MAX_WATCHES,
 } as const
 type RequestClass = 'ordinary' | keyof typeof managementLimits
 
 function requestClass(method: string): RequestClass {
   switch (method) {
-    case 'heartbeat': case 'close': case 'process.terminate': case 'fs.streamClose': return method
+    case 'heartbeat': case 'close': case 'process.terminate': case 'fs.streamClose':
+    case 'fs.watchNext': case 'fs.watchClose': return method
     // All other private operations share the configured request budget.
     default: return 'ordinary'
   }
