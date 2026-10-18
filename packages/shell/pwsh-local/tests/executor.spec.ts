@@ -90,6 +90,7 @@ async function setup(config: Parameters<typeof PwshLocalExecutor.Config>[0] = {}
   ;(ctx.subprocess as LocalSubprocessRuntime).internals = { spillDir }
   // A short kill grace via the REAL config path, so escalation tests stay fast.
   await ctx.plugin(PwshLocalExecutor, { graceMs: 200, ...config })
+  expect(ctx.shell.shellKind).toBe('pwsh')
   const bash = ctx.shell as PwshLocalExecutor
   return { ctx, bash }
 }

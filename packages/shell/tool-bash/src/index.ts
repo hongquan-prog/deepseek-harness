@@ -15,7 +15,7 @@ import type {} from '@deepseek-ai/dsh-working-directory'
 import { FiberState } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { isAbsolute, sep } from 'node:path'
+import { posix, win32 } from 'node:path'
 import { defineTool, TOOL_ABORTED } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView, TerminalCallView, ToolDefinition, ToolExecution, ToolResult, ToolResultView } from '@deepseek-ai/dsh-tools'
 import { HarnessError } from '@deepseek-ai/dsh-llm'
@@ -142,13 +142,19 @@ function presentBashResult(args: unknown, result: ToolResult): ToolResultView | 
   return { card: 'terminal', output: body, ...exit }
 }
 
-/** Resolve a relative per-call override against the Session's current directory. */
-function resolveWorkdir(modelWorkdir: string | undefined, sessionCwd: string | undefined): string | undefined {
+/**
+ * Resolve a relative per-call override against the Session's current directory
+ * using that directory's path semantics: a POSIX session path (including a WSL
+ * workspace) joins with `/`, a Windows session path keeps `\\`.
+ * @param modelWorkdir - model-supplied workdir, absolute or relative.
+ * @param sessionCwd - the Session's canonical execution-world directory.
+ * @returns the effective workdir, or undefined when neither input is present.
+ */
+export function resolveWorkdir(modelWorkdir: string | undefined, sessionCwd: string | undefined): string | undefined {
   if (modelWorkdir === undefined) return sessionCwd
-  if (sessionCwd !== undefined && !isAbsolute(modelWorkdir)) {
-    return `${sessionCwd}${sep}${modelWorkdir}`
-  }
-  return modelWorkdir
+  if (sessionCwd === undefined) return modelWorkdir
+  const pathApi = sessionCwd.startsWith('/') ? posix : win32
+  return pathApi.isAbsolute(modelWorkdir) ? modelWorkdir : pathApi.join(sessionCwd, modelWorkdir)
 }
 
 /** Detach the executor DTO from readonly Service Definition types into plain JSON data. */

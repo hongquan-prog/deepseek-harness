@@ -21,6 +21,17 @@
 - id: directory-picker
   disabled: true
 
+# The distribution runs bash; the host PowerShell executor must not answer
+# here. Model-facing tools come from agent presets, which select their shell
+# tool from the mounted executor's `shellKind`.
+- id: bash-sandbox
+  disabled: false
+  config:
+    timeoutMs: 60000
+
+- id: pwsh-sandbox
+  disabled: true
+
 - id: sandbox-policy
   config:
     mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'

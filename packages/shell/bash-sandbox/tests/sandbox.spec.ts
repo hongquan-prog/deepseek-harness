@@ -426,6 +426,7 @@ describe('per-call sandbox policy (the session and escalation carrier)', () => {
   it('exposes the configured default as the capability fact, and resolve() stamps it', async () => {
     const { bash } = await setup()
     expect(bash.sandboxMode).toBe('read-only')
+    expect(bash.shellKind).toBe('bash')
     expect(bash.resolve({ command: 'true' }).sandboxPolicy).toEqual(executionPolicy('read-only'))
   })
 

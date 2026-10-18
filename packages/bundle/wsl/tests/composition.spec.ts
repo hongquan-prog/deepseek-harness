@@ -65,4 +65,21 @@ describe('WSL bundle composition', () => {
     expect(tree).toContain("- id: wsl-directory-picker-browse\n  name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'")
     expect(tree).toContain('workspaceRoot: !!js')
   }, 60_000)
+
+  it('mounts the bash executor and lets the preset pick its tool from shellKind', async () => {
+    const source = await readFile(patch, 'utf8')
+    expect(source).toContain('- id: bash-sandbox\n  disabled: false\n  config:\n    timeoutMs: 60000')
+    expect(source).toContain('- id: pwsh-sandbox\n  disabled: true')
+    expect(source).not.toContain('- id: tool-bash')
+    expect(source).not.toContain('- id: tool-pwsh')
+    const tree = await dumpConfig()
+    expect(tree).toContain("- id: bash-sandbox\n  name: '@deepseek-ai/dsh-bash-sandbox'\n  disabled: false")
+    expect(tree).toContain("- id: pwsh-sandbox\n  name: '@deepseek-ai/dsh-pwsh-sandbox'\n  disabled: true")
+    // The Web surface keeps the host-plane tools disabled; presets own the
+    // model-facing pair and select it from the mounted executor.
+    expect(tree).toContain("- id: tool-bash\n  name: '@deepseek-ai/dsh-tool-bash'\n  disabled: true")
+    expect(tree).toContain("- id: tool-pwsh\n  name: '@deepseek-ai/dsh-tool-pwsh'\n  disabled: true")
+    expect(tree).toContain("ctx.get('shell')?.shellKind !== 'bash'")
+    expect(tree).toContain("ctx.get('shell')?.shellKind !== 'pwsh'")
+  })
 })

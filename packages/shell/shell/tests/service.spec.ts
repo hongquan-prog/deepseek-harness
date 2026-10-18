@@ -78,6 +78,7 @@ describe('ShellExecutor service seam', () => {
     const ctx = new Context()
     await ctx.plugin(StubExecutor)
     expect(ctx.shell.sandboxMode).toBeUndefined()
+    expect(ctx.shell.shellKind).toBe('bash')
   })
 
   it('loading a second implementation throws (one bash service per context — cordis standard)', async () => {

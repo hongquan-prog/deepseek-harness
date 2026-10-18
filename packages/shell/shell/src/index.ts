@@ -76,6 +76,16 @@ export abstract class ShellExecutor extends Service {
   }
 
   /**
+   * The shell dialect this executor runs commands in. Presets select their
+   * model-facing shell tool from this fact, so a Windows host bridged to a WSL
+   * bash executor offers bash rather than PowerShell.
+   * @returns `'bash'` for POSIX shells (the default), `'pwsh'` for PowerShell.
+   */
+  get shellKind(): 'bash' | 'pwsh' {
+    return 'bash'
+  }
+
+  /**
    * Apply implementation-owned defaults and caps to a request before execution.
    * @param request - the caller's request; omitted fields get this
    *   implementation's defaults, capped fields are clamped.

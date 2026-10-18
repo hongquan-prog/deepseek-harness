@@ -76,8 +76,8 @@ This bundle contributes no request-prefix content. Its consumers own model-visib
 - **Local packages are not yet published** — `dsh plugin add` resolves the bundle and its providers from the registry, so an unpublished release can only be linked for composition tests.
 - **One distribution and one helper** — multiple distributions and connection pools remain deferred.
 - **Localhost forwarding is required** — a host that disables it cannot reach the stream relays.
-- **Shell tools stay local** — `bash`/`pwsh` tool selection and terminal ownership are not patched yet, so model commands do not automatically run in the distribution.
-- **Workspace selection is manual** — `DSH_WSL_WORKSPACE` and the sandbox policy must name the same Linux directory; the desktop picker and file watching follow later.
+- **Persistent terminals and folder creation are not wired yet** — the bundle enables the sandboxed bash executor and disables the host PowerShell executor; agent presets select the model-facing shell tool from the mounted executor's dialect, so commands run through the distribution's subprocess and sandbox. Persistent terminal ownership and the directory picker's new-folder action remain deferred; `createDirectory` currently rejects with `directory-create-failed`.
+- **Workspace selection is manual** — `DSH_WSL_WORKSPACE` and the sandbox policy must name the same Linux directory. The in-app picker and file watching are wired; the picker cannot create folders yet.
 
 <a id="dev-note"></a>
 ### Dev Note
