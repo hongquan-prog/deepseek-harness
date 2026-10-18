@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { SshRpcPeer, SSH_PROTOCOL_VERSION } from '../src/protocol.ts'
 import {
-  doneSchema, editResultSchema, entriesSchema, helloSchema, infoSchema, preparedSchema, targetSchema, writeResultSchema,
+  doneSchema, editResultSchema, entriesSchema, helloSchema, infoSchema, preparedSchema, relaySchema, targetSchema, writeResultSchema,
 } from '../src/schemas.ts'
 import { authenticateStream } from '../src/stream-security.ts'
 
@@ -34,9 +34,8 @@ async function collect(stream: Readable): Promise<Buffer> {
   })
 }
 
-/** Connect one helper-published stream and prove the per-stream capability with TLS-PSK. */
-async function connectStream(path: string, capability: string): Promise<Socket> {
-  const raw = createConnection({ path, allowHalfOpen: true })
+/** Prove one stream capability with TLS-PSK and track every socket for teardown. */
+async function authenticate(raw: Socket, capability: string): Promise<Socket> {
   openSockets.add(raw)
   raw.once('close', () => { openSockets.delete(raw) })
   try {
@@ -50,6 +49,32 @@ async function connectStream(path: string, capability: string): Promise<Socket> 
     openSockets.delete(raw)
     throw error
   }
+}
+
+/** Connect one reserved Unix stream endpoint. */
+function connectStream(path: string, capability: string): Promise<Socket> {
+  return authenticate(createConnection({ path, allowHalfOpen: true }), capability)
+}
+
+/** Connect one loopback relay publishing a reserved Unix stream endpoint. */
+function connectRelay(port: number, capability: string): Promise<Socket> {
+  return authenticate(createConnection({ host: '127.0.0.1', port, allowHalfOpen: true }), capability)
+}
+
+/** Resolve only when a fresh loopback connection is refused. */
+async function expectRefused(port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const socket = createConnection({ host: '127.0.0.1', port })
+    socket.once('connect', () => {
+      socket.destroy()
+      reject(new Error(`relay port ${port} still accepts connections`))
+    })
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      socket.destroy()
+      if (error.code === 'ECONNREFUSED') resolve()
+      else reject(error)
+    })
+  })
 }
 
 describe.skipIf(process.platform === 'win32')('SSH helper over a plain child-process pipe', () => {
@@ -154,6 +179,31 @@ describe.skipIf(process.platform === 'win32')('SSH helper over a plain child-pro
     const platform = process.platform === 'darwin' ? 'Darwin' : 'Linux'
     expect(out.toString('utf8')).toBe(`${platform}\n${root}\n`)
   }, 30_000)
+
+  it('republishes one reserved stream on loopback TCP', async () => {
+    if (peer === undefined) throw new Error('helper was not started')
+    const prepared = await peer.request('process.prepare', {
+      argv: ['/bin/sh', '-c', 'printf relayed'], cwd: root, graceMs: 5000,
+      stdio: { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
+    }, preparedSchema)
+    const stdoutEndpoint = prepared.streams.stdout
+    const stderrEndpoint = prepared.streams.stderr
+    if (stdoutEndpoint === undefined || stderrEndpoint === undefined) throw new Error('helper did not publish stdout and stderr endpoints')
+    await expect(peer.request('stream.relay', { path: '/etc/hosts' }, relaySchema)).rejects.toThrow('outside the helper root')
+    const relay = await peer.request('stream.relay', { path: stdoutEndpoint.path }, relaySchema)
+    const outputs = Promise.all([
+      collect(await connectRelay(relay.port, stdoutEndpoint.capability)),
+      collect(await connectStream(stderrEndpoint.path, stderrEndpoint.capability)),
+    ])
+    void outputs.catch(() => {})
+    await peer.request('process.start', { id: prepared.id }, z.object({}).strict())
+    const done = await peer.request('process.done', { id: prepared.id }, doneSchema)
+    const [out, err] = await outputs
+    expect(done.outcome).toMatchObject({ exitCode: 0, signal: null })
+    expect(out.toString('utf8')).toBe('relayed')
+    expect(err.toString('utf8')).toBe('')
+    await expectRefused(relay.port)
+  })
 
   it('closes its private root when the transport ends', async () => {
     if (peer === undefined || child === undefined) throw new Error('helper was not started')

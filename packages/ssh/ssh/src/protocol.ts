@@ -6,7 +6,11 @@ import type { Readable, Writable } from 'node:stream'
 import { z } from 'zod'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 
-/** Wire version shared by the installed helper and client package. */
+/**
+ * Wire version shared by the installed helper and client package. The installed
+ * helper digest pins the exact method set, so a helper-only method may land
+ * within one version; a client never calls a method its pinned helper lacks.
+ */
 export const SSH_PROTOCOL_VERSION = 2
 
 /** Maximum prepared or running process handles owned by one helper. */

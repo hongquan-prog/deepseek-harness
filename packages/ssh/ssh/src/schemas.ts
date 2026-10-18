@@ -63,6 +63,8 @@ export const helloSchema = z.object({
 }).strict()
 /** A prepared process publishes its sockets before target code may execute. */
 export const streamEndpointSchema = z.object({ path: remotePath, capability: z.string().regex(/^[0-9a-f]{64}$/) }).strict()
+/** Loopback TCP port bridging one reserved Unix stream endpoint. */
+export const relaySchema = z.object({ port: z.number().int().positive() }).strict()
 /** A stream capability reaches only the authenticated SSH client and its helper. */
 export type SshStreamEndpoint = z.infer<typeof streamEndpointSchema>
 /** Prepared process and its independently authenticated stream endpoints. */

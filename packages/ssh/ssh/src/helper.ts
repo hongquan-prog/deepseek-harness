@@ -15,6 +15,7 @@ import type { SandboxExecutionPolicy, SandboxPolicy } from '@deepseek-ai/dsh-san
 import { z } from 'zod'
 import { SshRpcPeer, RemoteOperationError, SSH_MAX_PROCESS_HANDLES, SSH_MAX_TEXT_STREAMS, SSH_PROTOCOL_VERSION } from './protocol.ts'
 import { RemoteProcesses } from './helper-processes.ts'
+import { StreamRelays } from './helper-relay.ts'
 import { editSchema, environmentSchema, intentSchema, policySchema, processIdSchema, remotePath, targetSchema, textStreamIdSchema } from './schemas.ts'
 import type { SshTextStreamId } from './schemas.ts'
 
@@ -59,6 +60,7 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
   const { ctx } = runtime
   const root = await mkdtemp('/tmp/dsh-ssh-')
   const processes = new RemoteProcesses(ctx, root, SSH_MAX_PROCESS_HANDLES, 30_000)
+  const relays = new StreamRelays(root)
   const lifetime = new AbortController()
   const iterators = new Map<SshTextStreamId, { iterator: AsyncIterator<string>; controller: AbortController }>()
   let lease: NodeJS.Timeout | undefined
@@ -73,7 +75,7 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
       for (const record of iterators.values()) record.controller.abort(lifetime.signal.reason)
       await Promise.allSettled([...iterators.values()].map(async record => record.iterator.return?.()))
       iterators.clear()
-      try { await processes.close() }
+      try { await relays.close(); await processes.close() }
       finally {
         try { await runtime.close() }
         finally { await rm(root, { recursive: true, force: true }) }
@@ -111,6 +113,10 @@ export async function runSshHelper(transport: HelperTransport): Promise<void> {
       }
     }
     if (!initialized || cleanup !== undefined) throw new Error('SSH helper is not accepting operations')
+    if (method === 'stream.relay') {
+      const input = z.object({ path: remotePath }).strict().parse(raw)
+      return relays.open(input.path)
+    }
     if (method === 'heartbeat') { object.parse(raw); touchLease(); return null }
     if (method === 'close') { object.parse(raw); await close(); return null }
     if (method === 'process.prepare') return processes.prepare(raw)

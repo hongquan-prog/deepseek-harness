@@ -59,6 +59,8 @@ The OpenSSH master carries private administrative RPC. Each program stream uses 
 
 Each stream reservation has a random 256-bit TLS pre-shared key carried only by administrative RPC. TLS authenticates both endpoints and protects every stream byte; the key is never sent as a stream preface. Socket directories are private (`0700`) and sockets use `0600`. Replacing a writable socket path cannot impersonate an endpoint or reveal the stream key; an attacker can still interrupt service or relay opaque TLS records.
 
+A client that cannot open the helper's Unix sockets can ask the helper to republish one reserved endpoint on an ephemeral `127.0.0.1` port. The relay accepts a single connection, forwards opaque bytes, and expires unless a client connects; TLS-PSK still authenticates the real endpoints, so the relay learns neither the key nor the stream contents.
+
 Connection disposal joins forwarding and cancellation subprocesses and partially established streams before removing local resources. Transport loss rejects pending operations and invalidates the connection. The helper starts managed cleanup on SSH EOF, termination signals or heartbeat expiry. A disconnected client cannot confirm the remote outcome; operations are never reconnected or replayed automatically.
 
 Failed startup and process results release their reservations after native quiescence; the bounded completion cache preserves the original rejection for later result reads. Helper shutdown also joins endpoint and directory cleanup already in progress.
